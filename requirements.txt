@@ -1,0 +1,8 @@
+rdflib>=7.0
+pandas>=2.0
+numpy>=1.24
+scipy>=1.10
+matplotlib>=3.7
+seaborn>=0.12
+tqdm>=4.65
+pyyaml>=6.0

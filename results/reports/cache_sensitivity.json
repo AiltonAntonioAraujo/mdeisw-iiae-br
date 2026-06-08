@@ -1,0 +1,38 @@
+{
+  "0%": {
+    "cache_hit_rate": 0.0,
+    "latency_mean": 31.09985787732618,
+    "translation_time_mean": 17.870554156239425,
+    "cache_hit_rate_observed": 0.0,
+    "cache_miss_rate_observed": 1.0,
+    "reduction_percent": 0.0,
+    "translation_savings_percent": 0.0
+  },
+  "50%": {
+    "cache_hit_rate": 0.5,
+    "latency_mean": 25.38394655956371,
+    "translation_time_mean": 12.095600722115545,
+    "cache_hit_rate_observed": 0.48847926267281105,
+    "cache_miss_rate_observed": 0.511520737327189,
+    "reduction_percent": 18.38,
+    "translation_savings_percent": 32.32
+  },
+  "80%": {
+    "cache_hit_rate": 0.8,
+    "latency_mean": 21.290655008993248,
+    "translation_time_mean": 6.994650825462766,
+    "cache_hit_rate_observed": 0.783410138248848,
+    "cache_miss_rate_observed": 0.21658986175115208,
+    "reduction_percent": 31.54,
+    "translation_savings_percent": 60.86
+  },
+  "95%": {
+    "cache_hit_rate": 0.95,
+    "latency_mean": 18.96881805140212,
+    "translation_time_mean": 5.05561353538013,
+    "cache_hit_rate_observed": 0.9534883720930233,
+    "cache_miss_rate_observed": 0.046511627906976744,
+    "reduction_percent": 39.01,
+    "translation_savings_percent": 71.71
+  }
+}

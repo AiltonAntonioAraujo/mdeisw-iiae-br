@@ -1,0 +1,278 @@
+# ============================================================================
+# IIAE-BR - Configuração Completa do Experimento
+# Arquitetura de Interoperabilidade de Agentes Inteligentes para E-commerce
+# (Interoperabilidade de Agentes Inteligentes no E-commerce Brasileiro)
+#
+# Vocabulários: Schema.org e GoodRelations | Protocolo: FIPA-ACL
+# Serialização: JSON-LD | Dataset: Olist Brazilian E-Commerce (Kaggle)
+#
+# Arquivo único de configuração do projeto. Consome tanto a simulação
+# Monte Carlo (motor + casos de uso) quanto o ``ConfigService`` da camada
+# de infraestrutura.
+# ============================================================================
+
+experiment:
+  name: "IIAE-BR Monte Carlo Simulation"
+  version: "1.0.0"
+  description: "Avaliação Quantitativa da Arquitetura IIAE-BR com Dataset Olist"
+  seed: 42
+
+# ============================================================================
+# ARQUITETURA DE 5 CAMADAS
+# ============================================================================
+architecture:
+  name: "IIAE-BR"
+  # Lista canônica das cinco camadas (consumida pelo ConfigService).
+  layers:
+    - application
+    - orchestration
+    - interoperability
+    - communication
+    - infrastructure
+
+# ============================================================================
+# CAMADA 1 - APLICAÇÃO (AGENTES)
+# ============================================================================
+application:
+  agents:
+    sales:
+      id: "sales-001"
+      name: "Sales Agent"
+      ontology: "schema_org"
+      description: "Agente de vendas usando vocabulário Schema.org"
+      enabled: true
+      behaviors:
+        - "consultar_produto"
+        - "verificar_disponibilidade"
+        - "processar_pedido"
+        - "confirmar_pedido"
+    logistics:
+      id: "logistics-001"
+      name: "Logistics Agent"
+      ontology: "goodrelations"
+      description: "Agente de logística usando vocabulário GoodRelations"
+      enabled: true
+      behaviors:
+        - "calcular_prazo"
+        - "calcular_frete"
+        - "registrar_entrega"
+        - "notificar_status"
+
+# ============================================================================
+# CAMADA 2 - ORQUESTRAÇÃO
+# ============================================================================
+orchestration:
+  max_queue_size: 1000
+  conversation_timeout: 300
+  load_balancing: round_robin
+
+# ============================================================================
+# PARÂMETROS DE SIMULAÇÃO MONTE CARLO
+# ============================================================================
+simulation:
+  # Número de iterações (transações) por cenário.
+  iterations: 294
+
+  # Taxa-base de chegada de pedidos (Poisson - pedidos/hora), derivada da
+  # média do dataset Olist.
+  arrival_rate_base: 3600000.0
+
+  # Distribuição da carga entre os casos de uso (deve somar 1.0):
+  # UC1 (consulta, sem tradução) | UC2 (frete, tradução) | UC3 (pedido, tradução)
+  use_case_mix:
+    uc1: 0.20
+    uc2: 0.30
+    uc3: 0.50
+
+  # Tempos de processamento dos agentes (Normal - ms) — referência/calibração.
+  sales_processing:
+    mean: 50.0
+    std: 10.0
+  logistics_processing:
+    mean: 15.0
+    std: 5.0
+
+  # Probabilidade de uma mensagem requerer tradução semântica (referência).
+  translation_probability: 0.70
+
+  # Limiar de timeout (ms) — acima disto a transação é considerada timeout.
+  timeout_threshold: 5000.0
+  
+  # Probabilidade base de rejeição por sobrecarga (ajustada para melhor calibração)
+  loading_rejection_prob_base: 0.001
+
+# ============================================================================
+# CENÁRIOS DE CARGA
+# ============================================================================
+scenarios:
+  normal:
+    name: "Normal"
+    load_multiplier: 1.0
+    color: "blue"
+    description: "Carga normal de operação (1x)"
+  pico:
+    name: "Pico"
+    load_multiplier: 3.0
+    color: "green"
+    description: "Horário de pico (3x)"
+  blackfriday:
+    name: "Black Friday"
+    load_multiplier: 10.0
+    color: "yellow"
+    description: "Evento Black Friday (10x)"
+  estresse:
+    name: "Estresse"
+    load_multiplier: 20.0
+    color: "red"
+    description: "Teste de estresse extremo (20x)"
+
+# ============================================================================
+# CAMADA 3 - INTEROPERABILIDADE
+# ============================================================================
+interoperability:
+  # Semantic Mediator (mediação semântica Schema.org <-> GoodRelations)
+  semantic_mediator:
+    cache_enabled: true
+    # Taxas de Cache Hit para a análise de sensibilidade (camada 3).
+    cache_hit_rates:
+      - 0.0   # 0%  - sem cache (cache frio)
+      - 0.5   # 50%
+      - 0.8   # 80%
+      - 0.95  # 95% - cache aquecido
+    # Tempos de tradução quando há cache hit (Normal - ms).
+    translation_time_cache_hit:
+      mean: 1.5
+      std: 0.5
+    # Tempos de tradução quando há cache miss (Normal - ms).
+    translation_time_cache_miss:
+      mean: 10.0
+      std: 3.0
+    # Taxa de erro de tradução semântica.
+    translation_error_rate: 0.00099  # 0.1%
+    vocabularies:
+      - schema_org
+      - goodrelations
+
+  # Protocol Adapter FIPA-ACL
+  protocol_adapter:
+    protocols:
+      - fipa_acl
+    serialization: json_ld
+    performatives:
+      - REQUEST
+      - INFORM
+      - QUERY_REF
+      - CFP
+      - PROPOSE
+      - ACCEPT_PROPOSAL
+      - REJECT_PROPOSAL
+      - REFUSE
+      - NOT_UNDERSTOOD
+      - FAILURE
+
+  # Ontology Mapper
+  ontology_mapper:
+    vocabularies:
+      - schema_org
+      - goodrelations
+    mappings:
+      - from: "schema_org"
+        to: "goodrelations"
+        bidirectional: true
+
+# ============================================================================
+# CAMADA 4 - COMUNICAÇÃO
+# ============================================================================
+communication:
+  message_bus:
+    type: simple_queue
+    max_connections: 100
+  serialization: json_ld
+
+# ============================================================================
+# CAMADA 5 - INFRAESTRUTURA
+# ============================================================================
+infrastructure:
+  logging:
+    level: INFO
+    output: [console, file]
+  monitoring:
+    enabled: true
+    interval: 10
+
+# ============================================================================
+# SLAs (SERVICE LEVEL AGREEMENTS)
+# ============================================================================
+slas:
+  rejection_rate: 0.01        # <1.0%  - Taxa máxima de rejeição
+  success_rate: 0.999         # >99,9% - Taxa mínima de sucesso
+  latency_end_to_end: 150.0   # <150 ms - Latência máxima fim-a-fim
+  throughput_min: 1000.0      # >1000 msg/s - Throughput mínimo
+
+# ============================================================================
+# CASOS DE USO
+# ============================================================================
+use_cases:
+  uc1:
+    name: "Consultar Produto e Verificar Disponibilidade"
+    description: "Cliente consulta informações de produto (sem tradução)"
+    enabled: true
+    agents: ["sales"]
+    requires_translation: false
+  uc2:
+    name: "Calcular Prazo e Frete"
+    description: "Calcular prazo de entrega e valor do frete (com tradução)"
+    enabled: true
+    agents: ["sales", "logistics"]
+    requires_translation: true
+  uc3:
+    name: "Processar Pedido Completo"
+    description: "Fluxo completo de processamento de pedido (com tradução)"
+    enabled: true
+    agents: ["sales", "logistics"]
+    requires_translation: true
+
+# ============================================================================
+# DATASET
+# ============================================================================
+dataset:
+  source: "olist"
+  description: "Brazilian E-Commerce Public Dataset by Olist"
+  path: "data/"
+  files:
+    orders: "olist_orders_dataset.csv"
+    products: "olist_products_dataset.csv"
+    customers: "olist_customers_dataset.csv"
+    sellers: "olist_sellers_dataset.csv"
+    order_items: "olist_order_items_dataset.csv"
+
+# ============================================================================
+# OUTPUT
+# ============================================================================
+output:
+  results_dir: "results/"
+  charts_dir: "results/charts/"
+  reports_dir: "results/reports/"
+  charts:
+    - name: "taxa_rejeicao"
+      type: "bar"
+      sla: true
+    - name: "latencia_mediator"
+      type: "bar"
+      colors_by_scenario: true
+    - name: "taxa_sucesso"
+      type: "bar"
+      sla: true
+    - name: "latencia_fim_a_fim"
+      type: "bar"
+      sla: true
+    - name: "throughput"
+      type: "bar"
+      sla: true
+    - name: "histograma_latencia"
+      type: "histogram"
+      bins: [0, 50, 100, 150, 200, 250]
+      sla: true
+  tables:
+    - name: "sensibilidade_cache"
+      format: ["csv", "png"]
