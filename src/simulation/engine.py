@@ -5,8 +5,6 @@ Avalia quantitativamente a interoperabilidade entre o **SalesAgent**
 camadas da arquitetura IIAE-BR, usando o **dataset Olist real** e os
 **casos de uso concretos** (UC1, UC2, UC3).
 
-Implementa dois modos de operação:
-
 #. :class:`SimulationEngine` — motor principal, dirigido por
    configuração (``configs/iiae_br_config.yaml``). A cada iteração Monte
    Carlo executa um **caso de uso real** (UC1/UC2/UC3) por meio do
@@ -15,8 +13,6 @@ Implementa dois modos de operação:
    mediador semântico sobre dados reais do Olist. As métricas (latência
    fim-a-fim, tempo de tradução, throughput, confiabilidade) são
    agregadas a partir dessas execuções reais.
-#. :func:`run_simulation` — gerador estatístico legado (compatibilidade
-   com os testes existentes) baseado em :class:`DatasetMetrics`.
 """
 
 from __future__ import annotations
@@ -24,20 +20,13 @@ from __future__ import annotations
 import logging
 import random
 import time
-from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
 import yaml
-
-from src.simulation.layer_overhead import (
-    LayerOverheadAccumulator,
-    LayerOverheadModel,
-)
 from src.simulation.use_cases import UseCaseSimulator
-from src.utils.data_loader import DatasetMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +163,7 @@ class SimulationEngine:
                 ``estresse``.
 
         Returns:
-            Dicionário com todas as métricas especificadas (A–D).
+            Dicionário com todas as métricas.
         """
         scenario = self.scenarios[scenario_key]
         n_iterations = int(self.sim_config["iterations"]* float(
@@ -536,158 +525,3 @@ class SimulationEngine:
                 res["translation_savings_percent"] = 0.0
 
         return results
-
-
-# ======================================================================
-# Motor estatístico legado (compatibilidade com testes existentes)
-# ======================================================================
-
-@dataclass
-class RunResult:
-    """Resultado de uma única execução de simulação (motor legado)."""
-
-    latencies_ms: List[float] = field(default_factory=list)
-    transactions_completed: int = 0
-    transactions_rejected: int = 0
-    transactions_timeout: int = 0
-    transactions_started: int = 0
-    messages_total: int = 0
-    sim_duration_s: float = 0.0
-    deliveries_scheduled: int = 0
-    layer_overhead: Dict[str, Any] = field(default_factory=dict)
-
-    @property
-    def throughput(self) -> float:
-        if self.sim_duration_s <= 0:
-            return 0.0
-        return self.transactions_completed / self.sim_duration_s
-
-    @property
-    def rejection_rate(self) -> float:
-        if self.transactions_started <= 0:
-            return 0.0
-        return (
-            self.transactions_rejected + self.transactions_timeout
-        ) / self.transactions_started
-
-
-def run_simulation(
-    metrics: DatasetMetrics,
-    load_multiplier: float = 1.0,
-    cache_hit_rate: float = 0.0,
-    duration_s: float = 10.0,
-    warmup_s: float = 1.0,
-    n_buyers: int = 50,
-    n_sellers: int = 20,
-    n_mediators: int = 3,
-    n_logistics: int = 5,
-    seed: Optional[int] = None,
-    agent_kwargs: Optional[Dict[str, Any]] = None,
-    measure_layers: bool = True,
-) -> RunResult:
-    """Gerador estatístico de transações (compatibilidade com testes).
-
-    .. deprecated::
-        Usar :class:`SimulationEngine` para novos experimentos. Esta
-        função é mantida para compatibilidade com os testes existentes.
-
-    Args:
-        metrics: Métricas derivadas do dataset Olist.
-        load_multiplier: Fator de carga do cenário.
-        cache_hit_rate: Taxa de acerto do cache semântico (camada 3).
-        duration_s: Duração simulada (segundos).
-        warmup_s: Período de aquecimento descartado dos resultados.
-        n_buyers: Capacidade de geração de pedidos.
-        n_sellers: Capacidade de atendimento.
-        n_mediators: Capacidade de orquestração.
-        n_logistics: Agentes de logística.
-        seed: Semente aleatória.
-        agent_kwargs: Parâmetros extras.
-        measure_layers: Mede o overhead por camada se ``True``.
-
-    Returns:
-        :class:`RunResult` com dados de latência/throughput.
-    """
-    if seed is not None:
-        random.seed(seed)
-        np.random.seed(seed % (2**31))
-
-    rng = random.Random(seed)
-    akw = agent_kwargs or {}
-
-    processing_time_ms = float(akw.get("processing_time_ms", 150.0))
-    stock_probability = float(akw.get("stock_probability", 0.85))
-    patience_ms = float(akw.get("patience_ms", 3000.0))
-
-    base_interarrival = max(1e-3, float(metrics.mean_interarrival_s))
-    arrival_rate_per_s = (load_multiplier * max(n_buyers, 1)) / base_interarrival
-    arrival_rate_per_s = min(arrival_rate_per_s, 5000.0)
-
-    total_duration = warmup_s + duration_s
-    expected_arrivals = int(arrival_rate_per_s * total_duration)
-    expected_arrivals = max(1, min(expected_arrivals, 20000))
-
-    capacity_per_s = (n_sellers * 1000.0 / processing_time_ms) * max(n_mediators, 1)
-    capacity = max(1.0, capacity_per_s * total_duration)
-    rho = expected_arrivals / capacity
-
-    model = LayerOverheadModel(cache_hit_rate=cache_hit_rate)
-    acc = LayerOverheadAccumulator()
-
-    latencies: List[float] = []
-    started = 0
-    completed = 0
-    rejected = 0
-    timeout = 0
-    deliveries = 0
-
-    for _ in range(expected_arrivals):
-        started += 1
-
-        if rho > 1.0 and rng.random() < (1.0 - 1.0 / rho):
-            rejected += 1
-            continue
-
-        service_ms = max(1.0, rng.gauss(processing_time_ms, processing_time_ms * 0.25))
-        if rho < 1.0:
-            wait_ms = service_ms * (rho / max(1e-3, 1.0 - rho))
-        else:
-            wait_ms = service_ms * rho
-        wait_ms = min(wait_ms, patience_ms * 2)
-
-        total_ov, breakdown, hit = model.total(rng)
-        if measure_layers:
-            acc.add(breakdown, hit)
-
-        total_latency = service_ms + wait_ms + total_ov
-
-        if total_latency > patience_ms:
-            timeout += 1
-            continue
-
-        if rng.random() > stock_probability:
-            rejected += 1
-            continue
-
-        completed += 1
-        deliveries += 1
-        latencies.append(total_latency)
-
-    if warmup_s > 0 and total_duration > 0 and latencies:
-        warmup_frac = warmup_s / total_duration
-        skip = int(len(latencies) * warmup_frac)
-        latencies = latencies[skip:]
-
-    result = RunResult(sim_duration_s=duration_s)
-    result.latencies_ms = latencies
-    result.transactions_started = started
-    result.transactions_completed = completed
-    result.transactions_rejected = rejected
-    result.transactions_timeout = timeout
-    result.messages_total = started * 5
-    result.deliveries_scheduled = deliveries
-
-    if measure_layers and acc.translations > 0:
-        result.layer_overhead = acc.as_dict()
-
-    return result

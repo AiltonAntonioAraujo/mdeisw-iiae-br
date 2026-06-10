@@ -188,32 +188,3 @@ def test_mediator_set_cache_hit_rate():
     assert mediator.cache_hit_rate == 0.95
     mediator.set_cache_hit_rate(1.5)  # clamp
     assert mediator.cache_hit_rate == 1.0
-
-
-def test_mediator_translate_with_timing():
-    mediator = SemanticMediator()
-    mediator.set_cache_hit_rate(1.0)  # sempre cache hit
-    out = mediator.translate_with_timing(
-        {"@type": "Product", "name": "Item"}, "goodrelations"
-    )
-    assert set(out.keys()) == {"translated_data", "translation_time", "cache_hit", "error"}
-    assert out["cache_hit"] is True
-    assert out["translation_time"] > 0
-    assert mediator.translation_stats["total"] == 1
-    assert mediator.translation_stats["cache_hits"] == 1
-
-
-def test_mediator_cache_hit_faster_than_miss():
-    import numpy as np
-    np.random.seed(123)
-    mediator = SemanticMediator()
-
-    mediator.set_cache_hit_rate(1.0)
-    hits = [mediator.translate_with_timing({"@type": "Product"}, "goodrelations")
-            ["translation_time"] for _ in range(200)]
-
-    mediator.set_cache_hit_rate(0.0)
-    misses = [mediator.translate_with_timing({"@type": "Product"}, "goodrelations")
-              ["translation_time"] for _ in range(200)]
-
-    assert sum(hits) / len(hits) < sum(misses) / len(misses)

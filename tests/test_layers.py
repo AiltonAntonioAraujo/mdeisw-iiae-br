@@ -275,38 +275,3 @@ def test_monitoring_records_layer_overhead():
     assert "interoperabilidade" in overheads
 
 
-# ---------------------------------------------------------------------------
-# Integração — Overhead por camada na simulação
-# ---------------------------------------------------------------------------
-def test_simulation_measures_layer_overhead():
-    from src.utils.data_loader import DatasetMetrics
-    from src.simulation.engine import run_simulation
-
-    m = DatasetMetrics()
-    r = run_simulation(m, load_multiplier=1.0, cache_hit_rate=0.0,
-                       duration_s=2.0, warmup_s=0.5, n_buyers=10,
-                       n_sellers=5, n_mediators=2, n_logistics=2, seed=1)
-    assert r.layer_overhead
-    layers = r.layer_overhead["avg_per_layer_ms"]
-    assert set(layers.keys()) == {
-        "aplicacao", "orquestracao", "interoperabilidade",
-        "comunicacao", "infraestrutura",
-    }
-    # Interoperabilidade deve ter overhead positivo (tradução + protocolo)
-    assert layers["interoperabilidade"] > 0
-
-
-def test_overhead_higher_with_no_cache():
-    from src.utils.data_loader import DatasetMetrics
-    from src.simulation.engine import run_simulation
-
-    m = DatasetMetrics()
-    r0 = run_simulation(m, cache_hit_rate=0.0, duration_s=2.0, warmup_s=0.5,
-                        n_buyers=10, n_sellers=5, n_mediators=2,
-                        n_logistics=2, seed=2)
-    r95 = run_simulation(m, cache_hit_rate=0.95, duration_s=2.0, warmup_s=0.5,
-                         n_buyers=10, n_sellers=5, n_mediators=2,
-                         n_logistics=2, seed=2)
-    i0 = r0.layer_overhead["avg_per_layer_ms"]["interoperabilidade"]
-    i95 = r95.layer_overhead["avg_per_layer_ms"]["interoperabilidade"]
-    assert i0 > i95

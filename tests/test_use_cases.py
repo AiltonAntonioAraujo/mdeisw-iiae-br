@@ -25,8 +25,6 @@ from src.layer_3_interoperability.agent_registry import AgentRegistry
 from src.layer_3_interoperability.semantic_mediator.mediator import (
     SemanticMediator,
 )
-from src.simulation.monte_carlo import MonteCarloSimulation
-from src.simulation.scenarios import DEFAULT_SCENARIOS
 from src.simulation.use_cases import LAYER_NAMES, UseCaseSimulator
 
 
@@ -134,35 +132,3 @@ def test_cache_reduz_overhead_interoperabilidade():
     assert soma95 < soma0
 
 
-# ---------------------------------------------------------------------------
-# Agregação Monte Carlo no formato consumido pela análise
-# ---------------------------------------------------------------------------
-def test_monte_carlo_simulation_agrega_resultados():
-    sim = _build_simulator()
-    mc_sim = MonteCarloSimulation(
-        sim, scenarios=DEFAULT_SCENARIOS[:2], cache_levels=[0.0, 0.8]
-    )
-    mc = mc_sim.run_simulation(
-        num_iterations=100, scenario=DEFAULT_SCENARIOS[0],
-        use_case="uc2", cache_level=0.0, progress=False,
-    )
-    assert mc.n_iterations == 100
-    assert len(mc.mean_latencies) == 100
-    assert len(mc.p95_latencies) == 1
-    assert len(mc.throughputs) == 100
-    assert all(name in mc.layer_overheads for name in LAYER_NAMES)
-    assert len(mc.layer_overheads["interoperabilidade"]) == 100
-
-
-def test_monte_carlo_experiment_combinacoes():
-    sim = _build_simulator()
-    mc_sim = MonteCarloSimulation(
-        sim, scenarios=DEFAULT_SCENARIOS[:2], cache_levels=[0.0, 0.8]
-    )
-    resultados = mc_sim.run_experiment(
-        num_iterations=50, use_case="uc1", progress=False
-    )
-    # 2 cenários × 2 níveis de cache = 4 combinações
-    assert len(resultados) == 4
-    nomes = {r.scenario_name for r in resultados}
-    assert nomes == {"Normal", "Pico"}

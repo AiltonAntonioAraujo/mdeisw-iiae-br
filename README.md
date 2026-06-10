@@ -130,11 +130,9 @@ experimento_iiae_br/
 │   ├── simulation/
 │   │   ├── engine.py              #   SimulationEngine (Monte Carlo sobre casos de uso reais)
 │   │   ├── use_cases.py           #   UseCaseSimulator (UC1/UC2/UC3, 5 camadas, dados Olist)
-│   │   ├── monte_carlo.py         #   MonteCarloSimulation + run_monte_carlo
-│   │   ├── scenarios.py           #   ScenarioManager (cenários lidos da config)
 │   │   └── layer_overhead.py      #   Medição de overhead por camada
-│   └── utils/                     # config, data_loader (OlistDataset), fipa_acl
-├── tests/                         # Testes unitários (47 testes)
+│   └── utils/                     # data_loader (OlistDataset), fipa_acl
+├── tests/                         # Testes unitários (38 testes)
 ├── main.py                        # Ponto de entrada
 ├── requirements.txt
 └── pyproject.toml
